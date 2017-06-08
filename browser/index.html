@@ -58,7 +58,7 @@
                 this.kickType = this.kickTypes.on1;
                 this.clapType = this.clapTypes.on1;
                 this.otherClap = true;
-                this.accelerate = 1;
+                this.acceleration = 1;
             }
 
             play() {
@@ -117,8 +117,14 @@
 
                 for (var i = 0; i < this.steps.length; i++) {
 
-                    let stepScheduleTime = i * currentDuration
+                    let stepScheduleTime = 0
                         , noteLength;
+
+                    if (i !== 0){
+                        stepScheduleTime = totalLoopTime;
+                    }
+                
+                    currentDuration *= this.acceleration;
 
                     totalLoopTime += currentDuration;
 
@@ -126,7 +132,7 @@
 
                     this.tryPlayStab(i, stepScheduleTime, noteLength);
                     this.tryPlayKick(i, stepScheduleTime, noteLength);
-                    this.tryPlayClap(i, stepScheduleTime, noteLength);
+                    this.tryPlayClap(i, stepScheduleTime, noteLength);                    
                 }
 
                 this.nextLoopTime += totalLoopTime;
@@ -203,7 +209,7 @@
                     if (nextIndex >= this.steps.length) nextIndex = 0;
                 }
 
-                return (currentDuration * (count - 1)) + currentDuration * 0.8;
+                return (currentDuration * (count - 1)) + currentDuration * 0.99;
             }
 
             getSample(whichOne) {
