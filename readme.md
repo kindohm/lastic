@@ -1,1 +1,1 @@
-a time-distributed web audio sequencer and synth
+a (prototype) time-distributed web audio sequencer and synth
