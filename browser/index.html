@@ -58,6 +58,7 @@
                 this.kickType = this.kickTypes.on1;
                 this.clapType = this.clapTypes.on1;
                 this.otherClap = true;
+                this.accelerate = 1;
             }
 
             play() {
@@ -78,7 +79,7 @@
             }
 
             setRandomSteps(chance) {
-                var count = this.getRandomInt(3, 20);
+                var count = this.getRandomInt(12, 40);
                 this.newSteps = [];
                 for (var i = 0; i < count; i++) {
                     if (Math.random() < chance) {
@@ -112,23 +113,16 @@
                 if (this.nextLoopTime > this.context.currentTime + this.maxScheduleAhead) return;
 
                 let totalLoopTime = 0;
+                let currentDuration = this.stepDuration;
 
                 for (var i = 0; i < this.steps.length; i++) {
 
-                    let node
-                        , stepScheduleTime = i * this.stepDuration
+                    let stepScheduleTime = i * currentDuration
                         , noteLength;
 
-                    totalLoopTime += this.stepDuration;
+                    totalLoopTime += currentDuration;
 
-                    noteLength = this.getLegatoNoteLength(i);
-
-
-                    // if (this.steps[i] === 'x') {
-                    //     node = this.getStab();
-                    //     node.start(this.nextLoopTime + stepScheduleTime);
-                    //     node.stop(this.nextLoopTime + stepScheduleTime + noteLength);
-                    // }
+                    noteLength = this.getLegatoNoteLength(i, currentDuration);
 
                     this.tryPlayStab(i, stepScheduleTime, noteLength);
                     this.tryPlayKick(i, stepScheduleTime, noteLength);
@@ -192,7 +186,7 @@
                 }
             }
 
-            getLegatoNoteLength(stepIndex) {
+            getLegatoNoteLength(stepIndex, currentDuration) {
                 let nextIndex = stepIndex + 1, count = 1, found = false;
 
                 if (nextIndex >= this.steps.length) nextIndex = 0;
@@ -209,7 +203,7 @@
                     if (nextIndex >= this.steps.length) nextIndex = 0;
                 }
 
-                return (this.stepDuration * (count - 1)) + this.stepDuration * 0.8;
+                return (currentDuration * (count - 1)) + currentDuration * 0.8;
             }
 
             getSample(whichOne) {
