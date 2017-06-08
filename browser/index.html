@@ -1,0 +1,104 @@
+<html>
+
+<head>
+    <title>strtch</title>
+    <style>
+        body {
+            font-family: sans-serif;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>hi</h1>
+    <script>
+        class Strtch {
+            constructor(kickSample) {
+                this.maxScheduleAhead = 0.2; // seconds
+                this.loopInterval = 100; // ms
+                this.loopDuration = 1; // seconds
+                this.doLoop = this.doLoop.bind(this);
+                this.loopDuration = this.loopDuration;
+                this.stepsPerLoop = 1;
+
+                this.context = new AudioContext();
+
+                this.context.decodeAudioData(kickSample, (buffer) => {
+                    console.log('doubl ereadyew!');
+                    this.kick = buffer;
+                });
+
+                this.kickId = 'kick';
+                this.noteId = 'note';
+
+                this.firstStep = this.kickId;
+            }
+
+            play() {
+                this.nextLoopTime = 0;
+                this.interval = setInterval(this.doLoop, this.loopInterval);
+            }
+
+            stop() {
+                clearInterval(this.interval);
+            }
+
+            setLoopDuration(dur) {
+                this.loopDuration = dur;
+            }
+
+            setStepsPerLoop(steps) {
+                this.stepsPerLoop = steps;
+            }
+
+            doLoop() {
+
+                if (this.nextLoopTime === 0) this.nextLoopTime = this.context.currentTime;
+
+                if (this.nextLoopTime > this.context.currentTime + this.maxScheduleAhead) return;
+
+                let stepTime = this.loopDuration / this.stepsPerLoop;
+
+                for (var i = 0; i < this.stepsPerLoop; i++) {
+                    let node;
+                    if (i === 0 && this.firstStep === this.kickId) {
+                        node = this.getKick();
+                    } else {
+                        node = this.getNote();
+                    }
+
+                    node.connect(this.context.destination);
+                    node.start(this.nextLoopTime + i * stepTime);
+                    node.stop(this.nextLoopTime + i * stepTime + stepTime * 0.8);
+                }
+
+                this.nextLoopTime += this.loopDuration;
+            }
+
+            getKick() {
+                let node = this.context.createBufferSource();
+                node.buffer = this.kick;
+                return node;
+            }
+
+            getNote() {
+                let node = this.context.createOscillator();
+                node.frequency.value = 200;
+                return node;
+            }
+        }
+
+        document.addEventListener("DOMContentLoaded", (event) => {
+            fetch('kick.wav')
+                .then((response) => {
+                    return response.arrayBuffer();
+                })
+                .then((arrayBuffer) => {
+                    window.s = new Strtch(arrayBuffer);
+                    console.log('READY');
+                });
+        });
+    </script>
+</body>
+
+</html>
