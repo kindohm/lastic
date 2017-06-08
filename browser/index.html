@@ -13,7 +13,7 @@
     <h1>hi</h1>
     <script>
         class Strtch {
-            constructor(kickSample, stabSample) {
+            constructor(kickSample, stabSample, clapSample) {
                 this.maxScheduleAhead = 0.2; // seconds
                 this.loopInterval = 100; // ms
                 this.stepDuration = 0.1; // seconds
@@ -29,6 +29,10 @@
                     this.stab = buffer;
                 });
 
+                this.context.decodeAudioData(clapSample, (buffer) => {
+                    this.clap = buffer;
+                });
+
                 this.firstStep = this.kickId;
 
                 this.steps = ['x', '.', 'x', '.', '.'];
@@ -36,11 +40,24 @@
                 this.newStepDuration = null;
 
                 this.kickTypes = {
-                    start: 0,
+                    on1: 0,
+                    all: 1,
                     every: 1
                 };
 
-                this.kickType = this.kickTypes.start;
+                this.clapTypes = {
+                    on1: 0,
+                    off: 1,
+                    half: 2,
+                    on1half: 3,
+                    halfhalf: 4,
+                    all: 5,
+                    every: 5
+                };
+
+                this.kickType = this.kickTypes.on1;
+                this.clapType = this.clapTypes.on1;
+                this.otherClap = true;
             }
 
             play() {
@@ -99,34 +116,80 @@
                 for (var i = 0; i < this.steps.length; i++) {
 
                     let node
-                        , kickNode
                         , stepScheduleTime = i * this.stepDuration
                         , noteLength;
 
                     totalLoopTime += this.stepDuration;
 
                     noteLength = this.getLegatoNoteLength(i);
-                    if (this.steps[i] === 'x') {
-                        node = this.getStab();
-                        node.start(this.nextLoopTime + stepScheduleTime);
-                        node.stop(this.nextLoopTime + stepScheduleTime + noteLength);
 
-                        if (this.kickType === this.kickTypes.every) {
-                            kickNode = this.getKick();
-                            kickNode.start(this.nextLoopTime + stepScheduleTime);
-                            kickNode.stop(this.nextLoopTime + stepScheduleTime + noteLength);
-                        }
-                    }
 
-                    if (i === 0 && this.kickType === this.kickTypes.start) {
-                        kickNode = this.getKick();
-                        kickNode.start(this.nextLoopTime + stepScheduleTime);
-                        kickNode.stop(this.nextLoopTime + stepScheduleTime + noteLength);
-                    }
+                    // if (this.steps[i] === 'x') {
+                    //     node = this.getStab();
+                    //     node.start(this.nextLoopTime + stepScheduleTime);
+                    //     node.stop(this.nextLoopTime + stepScheduleTime + noteLength);
+                    // }
 
+                    this.tryPlayStab(i, stepScheduleTime, noteLength);
+                    this.tryPlayKick(i, stepScheduleTime, noteLength);
+                    this.tryPlayClap(i, stepScheduleTime, noteLength);
                 }
 
                 this.nextLoopTime += totalLoopTime;
+            }
+
+            tryPlayStab(currentStep, stepScheduleTime, noteLength) {
+                if (this.shouldPlayStab(currentStep)) {
+                    let node = this.getStab();
+                    node.start(this.nextLoopTime + stepScheduleTime);
+                    node.stop(this.nextLoopTime + stepScheduleTime + noteLength);
+                }
+            }
+
+            shouldPlayStab(currentStep) {
+                return (this.steps[currentStep] === 'x');
+            }
+
+            tryPlayKick(currentStep, stepScheduleTime, noteLength) {
+                if (this.shouldPlayKick(currentStep)) {
+                    let kickNode = this.getKick();
+                    kickNode.start(this.nextLoopTime + stepScheduleTime);
+                    kickNode.stop(this.nextLoopTime + stepScheduleTime + noteLength);
+                }
+            }
+
+            shouldPlayKick(currentStep) {
+                if (currentStep === 0 && this.kickType === this.kickTypes.on1) return true;
+                if (this.steps[currentStep] === 'x' && this.kickType === this.kickTypes.all) return true;
+                return false;
+            }
+
+            tryPlayClap(currentStep, stepScheduleTime, noteLength) {
+                if (this.shouldPlayClap(currentStep)) {
+                    let clapNode = this.getClap();
+                    clapNode.start(this.nextLoopTime + stepScheduleTime);
+                    clapNode.stop(this.nextLoopTime + stepScheduleTime + noteLength);
+                }
+            }
+
+            shouldPlayClap(currentStep) {
+                let halfStep = Math.floor(this.steps.length / 2);
+                if (currentStep === 0 && this.clapType === this.clapTypes.on1) {
+                    return true;
+                } else if (this.clapType === this.clapTypes.half) {
+                    if (currentStep === halfStep) {
+                        return true;
+                    }
+                } else if (this.clapType === this.clapTypes.halfhalf) {
+                    if (currentStep === halfStep) {
+                        this.otherClap = !this.otherClap;
+                        if (this.otherClap) {
+                            return true;
+                        }
+                    }
+                } else if (this.steps[currentStep] === 'x' && this.clapType === this.clapTypes.every) {
+                    return true;
+                }
             }
 
             getLegatoNoteLength(stepIndex) {
@@ -169,6 +232,10 @@
                 return this.getSample(this.stab);
             }
 
+            getClap() {
+                return this.getSample(this.clap);
+            }
+
             getNote() {
                 let osc = this.context.createOscillator();
                 osc.frequency.value = 200;
@@ -185,12 +252,12 @@
 
         document.addEventListener("DOMContentLoaded", (event) => {
 
-            let stabArrayBuffer, kickArrayBuffer;
+            let stabArrayBuffer, kickArrayBuffer, clapArrayBuffer;
 
             function checkIsReady() {
-                if (stabArrayBuffer && kickArrayBuffer) {
+                if (stabArrayBuffer && kickArrayBuffer && clapArrayBuffer) {
 
-                    window.s = new Strtch(kickArrayBuffer, stabArrayBuffer);
+                    window.s = new Strtch(kickArrayBuffer, stabArrayBuffer, clapArrayBuffer);
 
                     window.fill = function (arg) {
                         if (typeof (arg) === 'number') {
@@ -199,6 +266,8 @@
                             console.log(window.s.setSteps(arg));
                         }
                     }
+
+                    window.fill(0.5);
 
                     console.log('READY');
 
@@ -220,6 +289,15 @@
                 })
                 .then((arrayBuffer) => {
                     kickArrayBuffer = arrayBuffer;
+                    checkIsReady();
+                });
+
+            fetch('clap.wav')
+                .then((response) => {
+                    return response.arrayBuffer();
+                })
+                .then((arrayBuffer) => {
+                    clapArrayBuffer = arrayBuffer;
                     checkIsReady();
                 });
         });
