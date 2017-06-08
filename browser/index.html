@@ -13,25 +13,34 @@
     <h1>hi</h1>
     <script>
         class Strtch {
-            constructor(kickSample) {
+            constructor(kickSample, stabSample) {
                 this.maxScheduleAhead = 0.2; // seconds
                 this.loopInterval = 100; // ms
-                this.loopDuration = 1; // seconds
+                this.stepDuration = 0.1; // seconds
                 this.doLoop = this.doLoop.bind(this);
-                this.loopDuration = this.loopDuration;
-                this.stepsPerLoop = 1;
 
                 this.context = new AudioContext();
 
                 this.context.decodeAudioData(kickSample, (buffer) => {
-                    console.log('doubl ereadyew!');
                     this.kick = buffer;
                 });
 
-                this.kickId = 'kick';
-                this.noteId = 'note';
+                this.context.decodeAudioData(stabSample, (buffer) => {
+                    this.stab = buffer;
+                });
 
                 this.firstStep = this.kickId;
+
+                this.steps = ['x', '.', 'x', '.', '.'];
+                this.newSteps = null;
+                this.newStepDuration = null;
+
+                this.kickTypes = {
+                    start: 0,
+                    every: 1
+                };
+
+                this.kickType = this.kickTypes.start;
             }
 
             play() {
@@ -43,59 +52,170 @@
                 clearInterval(this.interval);
             }
 
-            setLoopDuration(dur) {
-                this.loopDuration = dur;
+            setStepDuration(dur) {
+                this.newStepDuration = dur;
             }
 
-            setStepsPerLoop(steps) {
-                this.stepsPerLoop = steps;
+            setSteps(newSteps) {
+                this.newSteps = newSteps;
+            }
+
+            setRandomSteps(chance) {
+                var count = this.getRandomInt(3, 20);
+                this.newSteps = [];
+                for (var i = 0; i < count; i++) {
+                    if (Math.random() < chance) {
+                        this.newSteps.push('x');
+                    } else {
+                        this.newSteps.push('.');
+                    }
+                }
+                return this.newSteps;
+            }
+
+            getRandomInt(min, max) {
+                min = Math.ceil(min);
+                max = Math.floor(max);
+                return Math.floor(Math.random() * (max - min)) + min;
             }
 
             doLoop() {
+                if (this.newSteps) {
+                    this.steps = this.newSteps;
+                    this.newSteps = null;
+                }
+
+                if (this.newStepDuration) {
+                    this.stepDuration = this.newStepDuration;
+                    this.newStepDuration = null;
+                }
 
                 if (this.nextLoopTime === 0) this.nextLoopTime = this.context.currentTime;
 
                 if (this.nextLoopTime > this.context.currentTime + this.maxScheduleAhead) return;
 
-                let stepTime = this.loopDuration / this.stepsPerLoop;
+                let totalLoopTime = 0;
 
-                for (var i = 0; i < this.stepsPerLoop; i++) {
-                    let node;
-                    if (i === 0 && this.firstStep === this.kickId) {
-                        node = this.getKick();
-                    } else {
-                        node = this.getNote();
+                for (var i = 0; i < this.steps.length; i++) {
+
+                    let node
+                        , kickNode
+                        , stepScheduleTime = i * this.stepDuration
+                        , noteLength;
+
+                    totalLoopTime += this.stepDuration;
+
+                    noteLength = this.getLegatoNoteLength(i);
+                    if (this.steps[i] === 'x') {
+                        node = this.getStab();
+                        node.start(this.nextLoopTime + stepScheduleTime);
+                        node.stop(this.nextLoopTime + stepScheduleTime + noteLength);
                     }
 
-                    node.connect(this.context.destination);
-                    node.start(this.nextLoopTime + i * stepTime);
-                    node.stop(this.nextLoopTime + i * stepTime + stepTime * 0.8);
+                    if (i === 0 && this.kickType === this.kickTypes.start) {
+                        kickNode = this.getKick();
+                        console.log('kickNode', kickNode);
+                        kickNode.start(this.nextLoopTime + stepScheduleTime);
+                        kickNode.stop(this.nextLoopTime + stepScheduleTime + noteLength);
+                    }
+
                 }
 
-                this.nextLoopTime += this.loopDuration;
+                this.nextLoopTime += totalLoopTime;
+            }
+
+            getLegatoNoteLength(stepIndex) {
+                let nextIndex = stepIndex + 1, count = 1, found = false;
+
+                if (nextIndex >= this.steps.length) nextIndex = 0;
+
+                while (!found) {
+                    if (this.steps[nextIndex] === 'x' || count >= 100) {
+                        found = true;
+                    }
+                    else {
+                        nextIndex++;
+                        count++;
+                    }
+
+                    if (nextIndex >= this.steps.length) nextIndex = 0;
+                }
+
+                return (this.stepDuration * (count - 1)) + this.stepDuration * 0.8;
+            }
+
+            getSample(whichOne) {
+                let node = this.context.createBufferSource();
+                node.buffer = whichOne;
+
+                let gain = this.context.createGain();
+                gain.gain.value = 0.7;
+                node.connect(gain);
+
+                gain.connect(this.context.destination);
+                return node;
             }
 
             getKick() {
-                let node = this.context.createBufferSource();
-                node.buffer = this.kick;
-                return node;
+                return this.getSample(this.kick);
+            }
+
+            getStab(){
+                return this.getSample(this.stab);
             }
 
             getNote() {
-                let node = this.context.createOscillator();
-                node.frequency.value = 200;
-                return node;
+                let osc = this.context.createOscillator();
+                osc.frequency.value = 200;
+
+                let gain = this.context.createGain();
+                gain.gain.value = 0.7;
+                osc.connect(gain);
+
+                gain.connect(this.context.destination);
+
+                return osc;
             }
         }
 
         document.addEventListener("DOMContentLoaded", (event) => {
+
+            let stabArrayBuffer, kickArrayBuffer;
+
+            function checkIsReady() {
+                if (stabArrayBuffer && kickArrayBuffer) {
+
+                    window.s = new Strtch(kickArrayBuffer, stabArrayBuffer);
+
+                    window.fill = function (arg) {
+                        if (typeof (arg) === 'number') {
+                            console.log(window.s.setRandomSteps(arg));
+                        } else if (typeof (arg) === 'object') {
+                            console.log(window.s.setSteps(arg));
+                        }
+                    }
+
+                    console.log('READY');
+
+                }
+            }
+
+            fetch('stab.wav')
+                .then(response => {
+                    return response.arrayBuffer();
+                })
+                .then(arrayBuffer => {
+                    stabArrayBuffer = arrayBuffer;
+                    checkIsReady();
+                });
+
             fetch('kick.wav')
                 .then((response) => {
                     return response.arrayBuffer();
                 })
                 .then((arrayBuffer) => {
-                    window.s = new Strtch(arrayBuffer);
-                    console.log('READY');
+                    kickArrayBuffer = arrayBuffer;
+                    checkIsReady();
                 });
         });
     </script>
