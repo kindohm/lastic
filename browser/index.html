@@ -110,11 +110,16 @@
                         node = this.getStab();
                         node.start(this.nextLoopTime + stepScheduleTime);
                         node.stop(this.nextLoopTime + stepScheduleTime + noteLength);
+
+                        if (this.kickType === this.kickTypes.every) {
+                            kickNode = this.getKick();
+                            kickNode.start(this.nextLoopTime + stepScheduleTime);
+                            kickNode.stop(this.nextLoopTime + stepScheduleTime + noteLength);
+                        }
                     }
 
                     if (i === 0 && this.kickType === this.kickTypes.start) {
                         kickNode = this.getKick();
-                        console.log('kickNode', kickNode);
                         kickNode.start(this.nextLoopTime + stepScheduleTime);
                         kickNode.stop(this.nextLoopTime + stepScheduleTime + noteLength);
                     }
@@ -160,7 +165,7 @@
                 return this.getSample(this.kick);
             }
 
-            getStab(){
+            getStab() {
                 return this.getSample(this.stab);
             }
 
